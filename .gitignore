@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local database
+aura.db
+*.sqlite
+*.sqlite3
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

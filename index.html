@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WorkforceOS AI — Workforce Command Centre</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      /* ── Roster component ──────────────────────────────────────── */
+      .roster-wrap{max-width:1200px;margin:0 auto;padding:0 5vw 28px}
+      .roster{border:1px solid var(--line);background:var(--panel)}
+      .roster summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 20px;cursor:pointer}
+      .roster summary::-webkit-details-marker{display:none}
+      .roster-summary-left{display:flex;align-items:center;gap:11px}
+      .roster-summary-left b{font-size:13px}
+      .roster-summary-left span{font:10px 'DM Mono';color:var(--muted)}
+      .roster-toggle{font:700 11px Manrope;color:var(--green)}
+      .roster[open] .roster-toggle{color:var(--ink)}
+      .roster-body{border-top:1px solid var(--line);padding:18px 20px 21px}
+      .roster-intro{display:flex;justify-content:space-between;gap:20px;margin:0 0 15px;font-size:11px;color:var(--muted)}
+      .roster-intro strong{color:var(--ink)}
+      .employee-roster{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+      .employee-card{display:flex;align-items:center;gap:8px;padding:10px;background:#f4f6f1;border:1px solid transparent}
+      .employee-card:hover{border-color:var(--green);background:#fff}
+      .employee-avatar{display:grid;place-items:center;flex:0 0 27px;width:27px;height:27px;border-radius:50%;background:var(--deep);color:var(--lime);font:9px 'DM Mono'}
+      .employee-card strong,.employee-card span{display:block}
+      .employee-card strong{font-size:10px;line-height:1.25}
+      .employee-card span{font:9px 'DM Mono';color:var(--muted);margin-top:2px}
+      .employee-card small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;font-size:9px;color:var(--green);margin-top:2px}
+      @media(max-width:760px){
+        .employee-roster{grid-template-columns:1fr 1fr}
+        .roster-intro{display:block;line-height:1.7}
+        .roster-wrap{padding-bottom:18px}
+        .employee-card small{max-width:80px}
+      }
+
+      /* ── Roster analytics tab ──────────────────────────────────── */
+      .roster-tabs{display:flex;gap:6px;margin:0 0 16px}
+      .roster-tabs button{border:1px solid var(--line);background:transparent;padding:8px 10px;cursor:pointer;color:var(--muted);font:700 10px Manrope}
+      .roster-tabs button.active{background:var(--ink);border-color:var(--ink);color:#fff}
+      .roster-panel[hidden]{display:none}
+      .workforce-table-wrap{border:1px solid var(--line);overflow:auto;background:#fff}
+      .workforce-table{min-width:760px;width:100%;border-collapse:collapse;text-align:left}
+      .workforce-table th{font:9px 'DM Mono';letter-spacing:.08em;color:var(--muted);padding:11px;border-bottom:1px solid var(--line)}
+      .workforce-table td{padding:11px;border-bottom:1px solid #edf0eb;font-size:10px}
+      .workforce-table tr:last-child td{border:0}
+      .workforce-person{display:flex;gap:7px;align-items:center}
+      .workforce-person .employee-avatar{width:24px;height:24px;flex-basis:24px}
+      .workforce-person strong,.workforce-person small{display:block}
+      .workforce-person strong{font-size:10px}
+      .workforce-person small{color:var(--muted);font:9px 'DM Mono';margin-top:2px}
+      .rate{font:700 11px 'DM Mono'}
+      .rate.good{color:var(--green)}
+      .rate.low{color:var(--amber)}
+      .workload-track{width:74px;height:4px;background:#e4e8e2}
+      .workload-track i{display:block;height:100%;background:var(--green)}
+      .workload-track.over i{background:var(--red)}
+      .method-note{font-size:10px;color:var(--muted);line-height:1.6;margin:13px 0 0}
+
+      /* ── Management topbar extras ──────────────────────────────── */
+      .management-badge{border:1px solid var(--line);padding:5px 7px;color:var(--green);font:9px 'DM Mono';letter-spacing:.06em;white-space:nowrap}
+      .management-alert{max-width:1200px;margin:0 auto;padding:16px 5vw;border-bottom:1px solid #ead5cb;background:#fff8f3;display:flex;align-items:center;justify-content:space-between;gap:24px}
+      .management-alert>div{display:flex;align-items:flex-start;gap:11px}
+      .alert-mark{display:grid;place-items:center;flex:0 0 21px;width:21px;height:21px;border-radius:50%;background:var(--amber);color:#fff;font-weight:800}
+      .management-alert b{font-size:11px}
+      .management-alert p{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.45}
+      .management-alert a{white-space:nowrap;color:var(--ink);font:700 11px Manrope}
+
+      /* ── Signout / demo-reset button ───────────────────────────── */
+      .signout-btn{border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted);font:700 10px Manrope;padding:6px 10px;white-space:nowrap}
+      .signout-btn:hover{color:var(--ink);border-color:var(--ink)}
+      .reset-btn{border:0;background:transparent;cursor:pointer;color:var(--muted);font:9px 'DM Mono';padding:4px 8px;letter-spacing:.06em}
+      .reset-btn:hover{color:var(--green)}
+
+      /* ── API status dot ────────────────────────────────────────── */
+      #apiStatusDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#72a970;margin-right:5px;transition:background .3s}
+      #apiStatusDot.offline{background:var(--amber)}
+
+      @media(max-width:760px){
+        .management-badge{display:none}
+        .management-alert{align-items:flex-start;flex-direction:column;gap:9px}
+        .management-alert a{margin-left:32px}
+        .signout-btn{display:none}
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grain"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#overview" aria-label="WorkforceOS home">
+        <span class="mark">W</span><span>WORKFORCE<i>OS</i></span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a class="active" href="#overview">Overview</a>
+        <a href="#decision">Decisions</a>
+        <a href="#tasks">Tasks</a>
+        <a href="analyzers.html">New Project</a>
+        <a href="analyzers.html#leave">Leave Impact</a>
+        <a href="analyzers.html#incident">Incident Simulator</a>
+        <a href="#analyst">AI analyst</a>
+      </nav>
+      <div class="top-actions">
+        <span class="management-badge">MANAGEMENT ACCESS</span>
+        <!-- sign out restores session and returns to employee login -->
+        <button class="signout-btn" id="managerSignOut" title="Sign out of management dashboard">Sign out</button>
+        <button class="profile" id="managerSignOut2" aria-label="Sign out">AM</button>
+      </div>
+    </header>
+
+    <main id="overview">
+
+      <section class="hero">
+        <div>
+          <p class="eyebrow">WORKFORCE COMMAND CENTRE / CHENNAI DELIVERY TEAM</p>
+          <h1>Keep critical work<br /><em>moving forward.</em></h1>
+          <p class="lede">A clear view of people, priorities, and risk—so your team can act before a small disruption becomes an SLA breach.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#decision">Review live decision <span>→</span></a>
+            <button class="text-link" id="openScenario">Try a what-if scenario ↓</button>
+          </div>
+        </div>
+        <aside class="hero-note">
+          <span class="note-icon">↗</span>
+          <p class="eyebrow">TODAY'S FOCUS</p>
+          <strong>2 decisions<br />need approval</strong>
+          <p>One critical task is at risk. A coverage plan is ready for review.</p>
+          <a href="#decision">See recommendation →</a>
+        </aside>
+      </section>
+
+      <section class="status-strip" aria-label="System status">
+        <span><b></b> Allocation engine is healthy</span>
+        <span>Policy: <strong>balanced delivery</strong></span>
+        <!-- Demo reset only appears when API is live -->
+        <span id="resetWrap" style="display:none">
+          <button class="reset-btn" id="resetDemoBtn">↺ Reset demo data</button>
+        </span>
+      </section>
+
+      <section class="management-alert" aria-label="Management attention required">
+        <div>
+          <span class="alert-mark">!</span>
+          <div>
+            <b>Management attention required</b>
+            <p>An employee has not responded to the 30-minute break check. Their active task requires coverage review.</p>
+          </div>
+        </div>
+        <a href="#decision">Review escalation →</a>
+      </section>
+
+      <section class="metrics section-tight" aria-label="Workforce summary">
+        <article>
+          <span>Available now</span>
+          <strong>48<span>/50</span></strong>
+          <small class="positive">from workforce dataset</small>
+        </article>
+        <article>
+          <span>At-risk tasks</span>
+          <strong id="riskCount">3</strong>
+          <small class="warning">review decisions</small>
+        </article>
+        <article>
+          <span>Team capacity</span>
+          <strong>78<span>%</span></strong>
+          <div class="meter"><i style="width:78%"></i></div>
+        </article>
+        <article>
+          <span>Protected SLA value</span>
+          <strong>₹2.4<span>L</span></strong>
+          <small>from active plans</small>
+        </article>
+      </section>
+
+      <!-- Employee Directory -->
+      <section class="roster-wrap" aria-label="Available employee directory">
+        <details class="roster">
+          <summary>
+            <div class="roster-summary-left">
+              <b>Available people directory</b>
+              <span>50 employees in the current workforce feed</span>
+            </div>
+            <span class="roster-toggle">Show names &amp; IDs ↓</span>
+          </summary>
+          <div class="roster-body">
+            <p class="roster-intro">
+              <span>Browse employee records in the current dataset.</span>
+              <span>Names · IDs · role · location</span>
+            </p>
+            <div class="roster-tabs" role="tablist">
+              <button class="active" data-roster-view="directory">Directory</button>
+              <button data-roster-view="analytics">Capacity &amp; performance</button>
+            </div>
+            <div class="roster-panel" id="directoryPanel">
+              <div class="employee-roster" id="employeeRoster"></div>
+            </div>
+            <div class="roster-panel" id="analyticsPanel" hidden>
+              <div class="workforce-table-wrap">
+                <table class="workforce-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Role / location</th>
+                      <th>Workload</th>
+                      <th>Available rate</th>
+                      <th>SLA performance</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analyticsRoster"></tbody>
+                </table>
+              </div>
+              <p class="method-note">Available rate = remaining daily capacity after current workload. SLA performance = historical SLA success rate from the workforce dataset. When the API is live, figures come directly from the database.</p>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Live Decision -->
+      <section id="decision" class="section decision-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">LIVE DECISION</p>
+            <h2>Coverage plan, ready to review.</h2>
+          </div>
+          <p>Choose an event below. The workspace shows a recommended, explainable allocation—not an automatic personnel decision.</p>
+        </div>
+        <div class="event-tabs" role="tablist" aria-label="Decision events">
+          <button class="event-tab active" data-event="break" role="tab">Extended break <span>Needs review</span></button>
+          <button class="event-tab" data-event="leave" role="tab">Leave request <span>Tomorrow</span></button>
+          <button class="event-tab" data-event="critical" role="tab">Critical incident <span>New</span></button>
+        </div>
+        <div class="decision-grid">
+          <article class="panel event-panel">
+            <p class="eyebrow" id="eventEyebrow">EVENT / EXTENDED BREAK</p>
+            <h3 id="eventTitle">Arun's break has passed 30 minutes.</h3>
+            <p class="panel-copy" id="eventDescription">His active API task has 3.5 hours remaining. Without coverage, the delivery window is at risk.</p>
+            <dl class="event-details" id="eventDetails"></dl>
+            <div class="impact-box">
+              <span>IF WE DO NOTHING</span>
+              <strong id="inactionRisk">41% SLA breach risk</strong>
+              <p id="inactionCopy">Approx. ₹18,000 in potential delay cost.</p>
+            </div>
+            <button class="button outline wide" id="viewTaskBtn">View affected task <span>→</span></button>
+          </article>
+          <article class="panel recommendation-panel" aria-live="polite">
+            <div class="recommendation-top">
+              <div>
+                <p class="eyebrow">RECOMMENDED PLAN</p>
+                <p class="recommendation-label" id="recommendationLabel">Temporary coverage</p>
+              </div>
+              <span class="confidence" id="confidence">92% fit</span>
+            </div>
+            <h3 id="recommendationTitle">Priya covers 35% of T-104.</h3>
+            <p class="recommendation-copy" id="recommendationDescription">She matches the backend requirements, has 4.2 available hours, and keeps both employees within planned capacity.</p>
+            <div class="result-metrics">
+              <div><span>SLA risk</span><strong id="riskChange">41% <i>→</i> 9%</strong></div>
+              <div><span>Coverage</span><strong id="coverageValue">35% of task</strong></div>
+              <div><span>Estimated impact</span><strong id="impactValue">₹18k avoided</strong></div>
+            </div>
+            <div class="factor-title"><span>Why this plan</span><small>auditable signals</small></div>
+            <div class="factors" id="factors"></div>
+            <div class="recommendation-actions">
+              <button class="button primary" id="applyPlan">Approve coverage <span>→</span></button>
+              <button class="secondary-action" id="showAlternatives">Compare alternatives</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Workforce Pulse -->
+      <section id="workforce" class="pulse-section">
+        <div class="section content-width">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">WORKFORCE PULSE</p>
+              <h2>Know where help is needed.</h2>
+            </div>
+            <p>Human-readable status, so managers can scan the team in seconds.</p>
+          </div>
+          <div class="pulse-grid">
+            <article class="pulse-card highlight">
+              <span class="pulse-number">05</span>
+              <h3>Ready to help</h3>
+              <p>Qualified people with enough capacity to absorb priority work.</p>
+              <button class="text-link" data-filter="available">View available people →</button>
+            </article>
+            <article class="pulse-card">
+              <span class="pulse-number warning-text">03</span>
+              <h3>Need attention</h3>
+              <p>People nearing capacity or with a task that needs a manager check-in.</p>
+              <button class="text-link" data-filter="attention">Review workload →</button>
+            </article>
+            <article class="pulse-card">
+              <span class="pulse-number">04</span>
+              <h3>On leave / break</h3>
+              <p>Absences that are already covered or being evaluated.</p>
+              <button class="text-link" data-filter="away">See coverage →</button>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Task Priority Table -->
+      <section id="tasks" class="section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PRIORITISE</p>
+            <h2>Work that needs a decision.</h2>
+          </div>
+          <p>Focus attention on the tasks with the highest operational risk.</p>
+        </div>
+        <div class="task-toolbar">
+          <div class="segmented" aria-label="Filter tasks">
+            <button class="selected" data-task-filter="all">All work</button>
+            <button data-task-filter="risk">At risk</button>
+            <button data-task-filter="unassigned">Unassigned</button>
+          </div>
+          <label class="search">
+            <span>⌕</span>
+            <input id="taskSearch" type="search" placeholder="Find a task or owner" />
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Priority</th>
+                <th>Task</th>
+                <th>Owner</th>
+                <th>Deadline</th>
+                <th>Remaining</th>
+                <th>Risk</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="taskBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- What-if Simulator -->
+      <section id="simulator" class="section simulator">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SIMULATE</p>
+            <h2>Test a change before it happens.</h2>
+          </div>
+          <p>Compare the current plan with a disruption, using the same policy rules as the live workspace.</p>
+        </div>
+        <div class="simulation-grid">
+          <div class="simulation-controls">
+            <label>
+              Scenario
+              <select id="scenarioSelect">
+                <option value="leave">An employee takes leave tomorrow</option>
+                <option value="incident">A critical production incident arrives</option>
+                <option value="capacity">Key engineer reaches full capacity</option>
+              </select>
+            </label>
+            <label>
+              Planning window
+              <select id="windowSelect">
+                <option>Next 8 hours</option>
+                <option>Next 24 hours</option>
+                <option>Next 3 days</option>
+              </select>
+            </label>
+            <button class="button dark wide" id="runSimulation">Run simulation <span>→</span></button>
+          </div>
+          <div class="scenario-result" id="simulationResult">
+            <div><span>—</span><strong>—</strong><small>Run a scenario to see results</small></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Conversational Analyst -->
+      <section id="analyst" class="analyst-section">
+        <div class="section analyst-grid">
+          <div>
+            <p class="eyebrow">CONVERSATIONAL ACCESS</p>
+            <h2>Ask the workforce analyst.</h2>
+            <p>The analyst turns clear questions into data checks and allocation simulations. It explains recommendations; it does not make employment decisions.</p>
+          </div>
+          <div class="ask-box">
+            <div id="chatOutput">Try: "Who can cover the payments API task?"</div>
+            <div class="chat-row">
+              <input id="chatInput" placeholder="Ask about your workforce…" />
+              <button id="askBtn">Ask →</button>
+            </div>
+            <div class="chips">
+              <button>What is at risk today?</button>
+              <button>Who can cover T-104?</button>
+              <button>Show team capacity</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <div class="toast" id="toast" role="status"></div>
+
+    <footer>
+      <span>WORKFORCEOS AI / prototype</span>
+      <span>Decision support with human approval.</span>
+    </footer>
+
+    <script src="app.js"></script>
+    <script>
+      /* ── extra wiring for elements added only in this HTML ─── */
+      document.addEventListener('DOMContentLoaded', () => {
+        /* second sign-out button (avatar) */
+        const btn2 = document.getElementById('managerSignOut2');
+        if (btn2) btn2.addEventListener('click', () => {
+          sessionStorage.removeItem('workforceosUser');
+          window.location.href = 'employee.html';
+        });
+
+        /* demo reset */
+        document.getElementById('resetDemoBtn')?.addEventListener('click', async () => {
+          try {
+            await fetch('/api/demo/reset', { method: 'POST' });
+            window.location.reload();
+          } catch {
+            /* ignore — button is only shown when API is live */
+          }
+        });
+
+        /* keep the API status dot and footer mode in sync */
+        const originalLoad = window._origLoad || (() => {});
+        function updateStatus(live) {
+          const dot = document.getElementById('apiStatusDot');
+          const footer = document.getElementById('footerMode');
+          const syncEl = document.getElementById('lastSync');
+          const resetWrap = document.getElementById('resetWrap');
+          if (dot) dot.className = live ? '' : 'offline';
+          if (footer) footer.textContent = live ? '· API live' : '· demo mode';
+          if (syncEl) syncEl.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+          if (resetWrap) resetWrap.style.display = live ? '' : 'none';
+        }
+
+        /* patch the load function to update status after each call */
+        const orig = window.loadDashboard;
+        if (typeof orig === 'function') {
+          window.loadDashboard = async function () {
+            await orig();
+            updateStatus(window.state?.apiLive ?? false);
+          };
+          /* trigger once on boot */
+          setTimeout(() => updateStatus(window.state?.apiLive ?? false), 1500);
+        }
+      });
+    </script>
+  </body>
+</html>
