@@ -1,0 +1,15 @@
+{
+  "dataset": "Synthetic historical workforce data \u2014 hackathon demonstration only",
+  "completion": {
+    "mae": 0.763,
+    "rmse": 1.085,
+    "r2": 0.906
+  },
+  "sla": {
+    "accuracy": 0.785,
+    "precision": 0.624,
+    "recall": 0.427,
+    "f1": 0.507,
+    "roc_auc": 0.743
+  }
+}
