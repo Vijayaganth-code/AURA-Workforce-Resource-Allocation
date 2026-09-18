@@ -1,15 +1,32 @@
 {
-  "dataset": "Synthetic historical workforce data \u2014 hackathon demonstration only",
+  "dataset": "performance_history",
+  "feature_order": [
+    "skill_match",
+    "skill_level",
+    "experience",
+    "workload",
+    "capacity",
+    "historical_completion",
+    "sla_success",
+    "estimated_hours",
+    "remaining_hours",
+    "complexity",
+    "priority",
+    "requirements",
+    "hours_until_deadline",
+    "performance"
+  ],
+  "records": 1000,
   "completion": {
-    "mae": 0.763,
-    "rmse": 1.085,
-    "r2": 0.906
+    "mae": 3.498,
+    "rmse": 4.197,
+    "r2": -0.176
   },
   "sla": {
-    "accuracy": 0.785,
-    "precision": 0.624,
-    "recall": 0.427,
-    "f1": 0.507,
-    "roc_auc": 0.743
+    "accuracy": 0.525,
+    "precision": 0.099,
+    "recall": 0.409,
+    "f1": 0.159,
+    "roc_auc": 0.484
   }
 }

@@ -1,9 +1,22 @@
 """SQLite repository and deterministic hackathon seed for AURA."""
-import random, sqlite3
+import os, tempfile, shutil, random, sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-DATABASE_PATH=Path(__file__).with_name("aura.db")
+
+def _get_db_path():
+    base_db = Path(__file__).with_name("aura.db")
+    if os.environ.get("VERCEL") or not os.access(Path(__file__).parent, os.W_OK):
+        tmp_db = Path(tempfile.gettempdir()) / "aura.db"
+        if not tmp_db.exists() and base_db.exists():
+            try:
+                shutil.copy(base_db, tmp_db)
+            except Exception:
+                pass
+        return tmp_db if tmp_db.exists() else base_db
+    return base_db
+
+DATABASE_PATH=_get_db_path()
 SKILLS=["Python","Java","JavaScript","React","FastAPI","SQL","Machine Learning","Deep Learning","NLP","Computer Vision","Cloud","DevOps","Docker","Cybersecurity","Data Engineering","Data Analysis","UI/UX","Testing","Project Management","System Design"]
 ROLES=[("Backend Engineer",["Python","FastAPI","SQL","Docker","System Design"]),("Data Engineer",["Python","SQL","Data Engineering","Cloud","Docker"]),("Frontend Engineer",["JavaScript","React","UI/UX","Testing","System Design"]),("DevOps Engineer",["Cloud","DevOps","Docker","Cybersecurity","Python"]),("AI Engineer",["Python","Machine Learning","NLP","Deep Learning","Cloud"]),("Data Analyst",["SQL","Data Analysis","Python","Project Management","Testing"])]
 NAMES=["Arun Kumar","Priya Nair","Rahul Mehta","Nikhil Shah","Maya Iyer","Vikram Rao","Aditi Singh","Karan Patel","Sneha Gupta","Arjun Das"]

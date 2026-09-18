@@ -1,4 +1,10 @@
-.env
-*.db
 __pycache__/
-ml/models/*.joblib
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.vercel
+.env
+.venv/
+env/
+venv/

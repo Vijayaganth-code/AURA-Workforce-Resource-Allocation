@@ -71,10 +71,52 @@ def approve_reallocation(recommendation_id):
   row=c.execute("SELECT * FROM recommendations WHERE recommendation_id=?",(recommendation_id,)).fetchone()
   if not row:raise ValueError('Recommendation not found')
   if row['status']!='PENDING':raise ValueError('Recommendation is no longer pending')
-  c.execute("UPDATE assignments SET status='REASSIGNED' WHERE task_id=? AND status='ACTIVE'",(row['task_id'],));c.execute("INSERT INTO assignments(assignment_id,employee_id,task_id,allocated_hours,status) VALUES (?,?,?,?,?)",(f"A-{row['task_id']}-{row['employee_id']}",row['employee_id'],row['task_id'],4,'ACTIVE'));c.execute("UPDATE recommendations SET status='APPROVED' WHERE recommendation_id=?",(recommendation_id,));c.execute("INSERT INTO notifications VALUES (?,?,?,?)",(f"N-{uuid.uuid4().hex[:10]}",f"Task {row['task_id']} assigned to {row['employee_id']} after manager approval.",'INFO',None))
+  c.execute("UPDATE assignments SET status='REASSIGNED' WHERE task_id=? AND status='ACTIVE'",(row['task_id'],));c.execute("INSERT INTO assignments(assignment_id,employee_id,task_id,allocated_hours,status) VALUES (?,?,?,?,?)",(f"A-{row['task_id']}-{row['employee_id']}",row['employee_id'],row['task_id'],4,'ACTIVE'));c.execute("UPDATE recommendations SET status='APPROVED' WHERE recommendation_id=?",(recommendation_id,));c.execute("INSERT INTO notifications(notification_id,message,severity,read_at) VALUES (?,?,?,?)",(f"N-{uuid.uuid4().hex[:10]}",f"Task {row['task_id']} assigned to {row['employee_id']} after manager approval.",'INFO',None))
  return {'approved':True,'recommendation_id':recommendation_id}
 def answer_question(q):
  q=q.lower();d=dashboard_data()
  if 'risk' in q:return f"The live risk radar contains {d['metrics']['risk_count']} high or critical tasks. Figures are model-derived from the current database."
  if 'leave' in q:return "Use the leave analysis workflow to create a non-mutating simulation; it checks the employee's assigned work, eligible candidates, and model risk before any approval."
  return f"The live command center has {d['metrics']['total_employees']} employees, {d['metrics']['active_tasks']} active tasks and {d['metrics']['utilization']}% utilization."
+
+def analyze_project(project):
+ """Non-mutating project intake assessment using the real workforce and ML scores."""
+ with connection() as c:
+  employees=_rows(c,'SELECT * FROM employees'); skills={r['name']:r['skill_id'] for r in _rows(c,'SELECT * FROM skills')}
+  qualified=[]; available=0
+  for e in employees:
+   free=max(0,e['daily_capacity_hours']-e['current_workload_hours'])
+   if e['availability'] and e['status'] in ('AVAILABLE','BUSY'): available+=free
+   es={r['name']:r['level'] for r in _rows(c,'SELECT s.name,es.level FROM employee_skills es JOIN skills s ON s.skill_id=es.skill_id WHERE es.employee_id=?',(e['employee_id'],))}
+   matches=[x for x in project['required_skills'] if es.get(x['skill'],0)>=x['required_level']]
+   if len(matches)==len(project['required_skills']) and e['availability'] and free>0:
+    ratio=sum(es[x['skill']]/5 for x in matches)/len(matches)
+    synthetic={'priority':project['priority'],'estimated_hours':project['estimated_hours'],'remaining_hours':project['estimated_hours'],'complexity':max(1,min(5,len(matches)+1))}
+    pred=predict(e,synthetic,ratio,sum(es[x['skill']] for x in matches)/len(matches),len(matches),max(1,(project['deadline']-datetime.now(timezone.utc)).total_seconds()/3600))
+    qualified.append({**e,'available_capacity_hours':round(free,1),'skill_match_score':round(ratio*100,1),'predicted_completion_hours':pred['completion_hours'],'sla_breach_probability':pred['sla_breach_probability']})
+  qualified.sort(key=lambda x:(x['sla_breach_probability'] if x['sla_breach_probability'] is not None else 1,-x['skill_match_score'],-x['available_capacity_hours']))
+  recommended=qualified[:project['required_employee_count']]
+  qualified_capacity=sum(x['available_capacity_hours'] for x in qualified)
+  deadline_hours=max(0,(project['deadline']-datetime.now(timezone.utc)).total_seconds()/3600)
+  predicted=max((x['predicted_completion_hours'] or project['estimated_hours'] for x in recommended),default=project['estimated_hours'])
+  feasible=len(recommended)>=project['required_employee_count'] and qualified_capacity>=project['estimated_hours'] and predicted<=deadline_hours and max((x['sla_breach_probability'] or 1 for x in recommended),default=1)<.6
+  # Do not recursively evaluate the whole dashboard here: one project intake must stay responsive.
+  at_risk=c.execute("SELECT COALESCE(SUM(revenue_inr),0) FROM tasks WHERE status='ACTIVE' AND priority IN ('Critical','High')").fetchone()[0]; gap=max(0,project['estimated_hours']-qualified_capacity)
+  reasons=[f"{len(qualified)} available employees meet every required skill level.",f"{qualified_capacity:.1f}h qualified capacity is available against {project['estimated_hours']}h required.",f"Predicted completion is {predicted:.1f}h with {deadline_hours:.1f}h until deadline."]
+  if gap: reasons.append(f"A qualified capacity gap of {gap:.1f}h makes the proposed staffing unsafe.")
+  return {'feasible':feasible,'confidence':round(sum(x['skill_match_score'] for x in recommended)/max(1,len(recommended))/100,2),'project':project,'capacity':{'required_hours':project['estimated_hours'],'available_hours':round(qualified_capacity,1),'total_available_hours':round(available,1),'capacity_gap':round(gap,1)},'qualified_resources':len(qualified),'recommended_resources':[{k:x[k] for k in ('employee_id','name','skill_match_score','available_capacity_hours','current_workload_hours','predicted_completion_hours','sla_breach_probability')} for x in recommended],'predicted_completion_hours':predicted,'sla_breach_probability':max((x['sla_breach_probability'] or 1 for x in recommended),default=1),'revenue_inr':project['revenue_inr'],'existing_revenue_at_risk':at_risk,'opportunity_cost_inr':round(min(at_risk,project['estimated_hours']*750),2),'risk_level':'LOW' if feasible else 'HIGH','reasoning':reasons,'alternative_options':['Extend the deadline or reduce scope.','Use a contractor for the capacity gap.'] if not feasible else ['Reserve the recommended resources pending manager approval.'],'simulation_only':True}
+
+def analyze_leave(employee_id,start_date,end_date):
+ with connection() as c:
+  employee=c.execute('SELECT * FROM employees WHERE employee_id=?',(employee_id,)).fetchone()
+  if not employee: raise ValueError('Employee not found')
+  employee=dict(employee); tasks=_rows(c,"SELECT t.* FROM tasks t JOIN assignments a ON a.task_id=t.task_id WHERE a.employee_id=? AND a.status='ACTIVE'",(employee_id,)); all_employees=_rows(c,'SELECT * FROM employees')
+ affected=[]; plans=[]; exposure=0
+ for task in tasks:
+  before=recommend(task['task_id']); simulated={'employees':deepcopy(all_employees)}
+  for e in simulated['employees']:
+   if e['employee_id']==employee_id:e['availability']=0;e['status']='ON_LEAVE'
+  after=recommend(task['task_id'],simulated); exposure+=task['revenue_inr'] if not after.get('feasible') else 0
+  affected.append({'task_id':task['task_id'],'task_name':task['task_name'],'priority':task['priority'],'remaining_hours':task['remaining_hours'],'deadline':task['deadline'],'current_owner':employee['name'],'risk':after.get('after',{}).get('sla_risk',1)})
+  if after.get('selected'): plans.append({'task_id':task['task_id'],'current_owner':employee['name'],'replacement':after['selected']['name'],'employee_id':after['selected']['employee_id'],'skill_match':after['selected']['skill_match_score'],'predicted_hours':after['selected']['predicted_completion_hours'],'sla_risk':after['selected']['sla_breach_probability']})
+ return {'employee':employee,'leave_period':{'start_date':start_date.isoformat(),'end_date':end_date.isoformat()},'affected_tasks':affected,'affected_task_count':len(affected),'revenue_at_risk_inr':exposure,'sla_risk_before':max([recommend(t['task_id']).get('after',{}).get('sla_risk',1) for t in tasks] or [0]),'sla_risk_after':max([x['risk'] for x in affected] or [0]),'replacement_candidates':plans,'simulated_allocation':plans,'workload_impact':[],'recommendation':'Leave is operationally feasible with the simulated coverage plan.' if len(plans)==len(tasks) else 'Do not approve leave without external coverage for uncovered work.','risk_level':'LOW' if len(plans)==len(tasks) else 'HIGH','simulation_only':True}
