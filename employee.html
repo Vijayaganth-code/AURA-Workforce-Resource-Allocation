@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WorkforceOS — Secure access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="employee.css" />
+</head>
+<body>
+  <header><a class="brand" href="employee.html"><span>W</span> WORKFORCE<i>OS</i></a><p>SECURE WORKSPACE ACCESS</p></header>
+  <main>
+    <section id="login" class="login-card"><p class="eyebrow">WORKFORCEOS LOGIN</p><h1>One sign-in.<br /><em>The right workspace.</em></h1><p>Employees see only their own work tools and performance analysis. Approved managers enter the private command centre.</p>
+      <form id="accessForm"><label>Work email<input id="email" type="email" placeholder="name@company.com" required /></label><label>Password<input id="password" type="password" placeholder="Enter demo password" required /></label><label>Access type<select id="role"><option value="employee">Employee</option><option value="manager">Manager</option></select></label><button>Continue securely →</button></form>
+      <details class="demo-access"><summary>View local demo accounts</summary><p>Select an employee to fill the email field. Each workspace has a different domain, SLA record, workload, leave history, and 1–10 performance analysis.</p><div id="demoAccounts" class="demo-accounts"></div><p><b>Private manager:</b> manager.demo@workforceos.local</p></details>
+      <small>Demo credentials: employee accounts use <b>employee123</b>; the manager account uses <b>manager123</b>. Production should replace this local-only check with secure server-side authentication.</small>
+    </section>
+    <section id="portal" hidden>
+      <div class="welcome"><div><p class="eyebrow">EMPLOYEE WORKSPACE · <span id="employeeId">E000</span></p><h1>Welcome back, <em id="employeeName">Employee</em>.</h1><p id="employeeMeta"></p></div><div class="welcome-actions"><button class="notification-button" id="showNotifications">Notifications <span id="notificationBadge">3</span></button><button class="signout" id="signOut">Sign out</button></div></div>
+      <div class="grid"><article class="card task"><p class="eyebrow">CURRENT TASK</p><h2 id="taskTitle">Payment API reconciliation</h2><p id="taskMeta">Priority: High · SLA: today, 4:30 PM</p><div class="progress"><i id="taskProgress"></i></div><span id="taskProgressText">67% complete</span></article><article class="card"><p class="eyebrow">TODAY</p><strong id="focusHours">6.0<span>h</span></strong><p>Focused work recorded</p></article><article class="card"><p class="eyebrow">STATUS</p><strong id="status">Working</strong><p>Update your availability below</p></article></div>
+      <div class="performance-band"><div><p class="eyebrow">PERSONAL PERFORMANCE SCORE</p><strong id="performanceScore">8.4<span>/10</span></strong><p>Based on SLA delivery, work quality, and planned availability. Approved leave does not reduce this score; break-policy flags require manager review.</p></div><div class="score-parts"><span>SLA delivery <b id="slaScore">9.1</b></span><span>Work quality <b id="qualityScore">8.6</b></span><span>Availability <b id="availabilityScore">8.0</b></span><span>Policy record <b id="policyRecord">8.0</b></span></div></div>
+      <div class="actions"><article><p class="eyebrow">BREAK &amp; CHECK-IN</p><h2>Need a break?</h2><p>The 30-minute check-in helps management plan task coverage if you cannot return on time.</p><button id="startBreak">Start break</button><button id="endBreak" class="dark" hidden>End break</button><div id="breakCheck" hidden class="check"><b>30-minute check-in</b><p>Are you able to resume work?</p><button class="dark" id="resume">Yes, resume</button><button class="plain" id="extend">Request extension</button></div><div class="mini-list"><div><span id="lastBreakTime">Today · 10:42 AM</span><b id="lastBreak">Meal break · 26 min</b></div><div><span>Current break status</span><b id="breakState">No active break</b></div></div></article><article><p class="eyebrow">LEAVE REQUESTS</p><h2>Plan time away.</h2><p>Submit dates; management receives a coverage review before deciding.</p><form id="leaveForm"><label>Start date<input id="leaveStart" type="date" required /></label><label>End date<input id="leaveEnd" type="date" required /></label><button>Request leave →</button></form><div id="leaveList" class="mini-list"></div></article></div>
+      <section class="history"><div><p class="eyebrow">WORK &amp; SLA HISTORY</p><h2>Your recent delivery record.</h2></div><div id="historyRows" class="history-table"></div></section>
+      <aside id="notifications" class="notifications" hidden><div><p class="eyebrow">YOUR NOTIFICATIONS</p><h2>Keep up to date.</h2></div><div id="notificationItems"></div></aside>
+    </section>
+  </main><div class="toast" id="toast"></div><script src="employee.js"></script>
+</body></html>
