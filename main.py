@@ -6,7 +6,7 @@ from fastapi import FastAPI,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,Field
-from backend_database import connection,initialise_database,reset_database
+from backend_database import connection,initialise_database,reset_database,sync_event_to_firebase
 from ml.model_runtime import ensure_models,status,predict
 from services import dashboard_data,candidates_for,recommend,simulate,create_recommendation,approve_reallocation,answer_question,analyze_project,analyze_leave
 ROOT=Path(__file__).parent;app=FastAPI(title="AURA Workforce Decision API",version="2.0.0")
@@ -79,22 +79,30 @@ def reject(recommendation_id:str):
  return {'rejected':True}
 @app.post('/api/events')
 def event(body:EventRequest):
- with connection()as c:c.execute('INSERT INTO events(event_id,event_type,employee_id,task_id,payload_json,created_at) VALUES (?,?,?,?,?,?)',(f'EV-{uuid.uuid4().hex[:10]}',body.event_type,body.employee_id,body.task_id,json.dumps(body.payload),datetime.now(timezone.utc).isoformat()))
+ eid=f'EV-{uuid.uuid4().hex[:10]}'
+ created_at=datetime.now(timezone.utc).isoformat()
+ with connection()as c:c.execute('INSERT INTO events(event_id,event_type,employee_id,task_id,payload_json,created_at) VALUES (?,?,?,?,?,?)',(eid,body.event_type,body.employee_id,body.task_id,json.dumps(body.payload),created_at))
+ sync_event_to_firebase('events',eid,{'event_id':eid,'event_type':body.event_type,'employee_id':body.employee_id,'task_id':body.task_id,'payload':body.payload,'created_at':created_at})
  return {'accepted':True,'simulation':simulate(body.event_type,body.employee_id,body.payload) if body.task_id else None}
 @app.post('/api/break/start')
 def break_start(body:BreakRequest):
+ bid=f'B-{uuid.uuid4().hex[:10]}'
+ started_at=datetime.now(timezone.utc).isoformat()
  with connection()as c:
   e=c.execute('SELECT status FROM employees WHERE employee_id=?',(body.employee_id,)).fetchone()
   if not e:raise HTTPException(404,'Employee not found')
   if e['status']=='ON_BREAK':raise HTTPException(409,'Employee already has an active break')
-  c.execute("UPDATE employees SET status='ON_BREAK',availability=0 WHERE employee_id=?",(body.employee_id,));c.execute('INSERT INTO break_sessions(break_id,employee_id,break_type,status,started_at,ended_at) VALUES (?,?,?,?,?,?)',(f'B-{uuid.uuid4().hex[:10]}',body.employee_id,body.break_type,'ACTIVE',datetime.now(timezone.utc).isoformat(),None))
+  c.execute("UPDATE employees SET status='ON_BREAK',availability=0 WHERE employee_id=?",(body.employee_id,));c.execute('INSERT INTO break_sessions(break_id,employee_id,break_type,status,started_at,ended_at) VALUES (?,?,?,?,?,?)',(bid,body.employee_id,body.break_type,'ACTIVE',started_at,None))
+ sync_event_to_firebase('break_sessions',bid,{'break_id':bid,'employee_id':body.employee_id,'break_type':body.break_type,'status':'ACTIVE','started_at':started_at})
  return {'started':True,'reassessment':'Monitor; reallocation is required only for a long break or critical SLA task.'}
 @app.post('/api/break/end')
 def break_end(body:BreakRequest):
+ ended_at=datetime.now(timezone.utc).isoformat()
  with connection()as c:
   b=c.execute("SELECT * FROM break_sessions WHERE employee_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",(body.employee_id,)).fetchone()
   if not b:raise HTTPException(409,'No active break exists for this employee')
-  c.execute("UPDATE break_sessions SET status='ENDED',ended_at=? WHERE break_id=?",(datetime.now(timezone.utc).isoformat(),b['break_id']));c.execute("UPDATE employees SET status='AVAILABLE',availability=1 WHERE employee_id=?",(body.employee_id,))
+  c.execute("UPDATE break_sessions SET status='ENDED',ended_at=? WHERE break_id=?",(ended_at,b['break_id']));c.execute("UPDATE employees SET status='AVAILABLE',availability=1 WHERE employee_id=?",(body.employee_id,))
+  sync_event_to_firebase('break_sessions',b['break_id'],{'status':'ENDED','ended_at':ended_at})
  return {'ended':True}
 @app.post('/api/leave/analyze')
 def leave_analyze(body:LeaveRequest):
@@ -107,8 +115,11 @@ def project_analyze(body:ProjectAnalysis):
 @app.post('/api/leave/request')
 def leave_request(body:LeaveRequest):
  if body.end_date<body.start_date:raise HTTPException(422,'End date must not precede start date')
- with connection()as c:c.execute('INSERT INTO leave_requests(leave_id,employee_id,start_date,end_date,status) VALUES (?,?,?,?,?)',(f'L-{uuid.uuid4().hex[:10]}',body.employee_id,body.start_date.isoformat(),body.end_date.isoformat(),'PENDING'))
+ lid=f'L-{uuid.uuid4().hex[:10]}'
+ with connection()as c:c.execute('INSERT INTO leave_requests(leave_id,employee_id,start_date,end_date,status) VALUES (?,?,?,?,?)',(lid,body.employee_id,body.start_date.isoformat(),body.end_date.isoformat(),'PENDING'))
+ sync_event_to_firebase('leave_requests',lid,{'leave_id':lid,'employee_id':body.employee_id,'start_date':body.start_date.isoformat(),'end_date':body.end_date.isoformat(),'status':'PENDING'})
  return {'created':True,'analysis':simulate('leave',body.employee_id)}
+
 @app.post('/api/employee/unavailable')
 def unavailable(body:EventRequest):return simulate('unavailable',body.employee_id,body.payload)
 @app.post('/api/employee/available')
