@@ -131,12 +131,12 @@ def analyze_task(body:TaskAnalysis):return simulate('new_project',None,body.mode
 @app.get('/api/decisions')
 def decisions():
  with connection() as c:return [dict(x) for x in c.execute("SELECT * FROM recommendations WHERE status='PENDING' ORDER BY created_at DESC")]
-@app.post('/api/simulations/{scenario}')
+@app.api_route('/api/simulations/{scenario}', methods=['GET', 'POST'])
 def scenario_simulation(scenario:str,body:EventRequest|None=None):
  allowed={'single_employee_unavailable','two_employees_unavailable','critical_task_arrives','deadline_shortened','priority_escalation','workforce_capacity_drop','high_value_project_capacity_shortage','skill_bottleneck','workload_spike','multiple_critical_tasks'}
  if scenario not in allowed:raise HTTPException(404,'Unknown simulation scenario')
- payload=(body.payload if body else {})
- employee_id=body.employee_id if body else None
+ payload=(body.payload if body and hasattr(body, 'payload') else {})
+ employee_id=body.employee_id if body and hasattr(body, 'employee_id') else None
  kind='multiple_unavailable' if scenario=='two_employees_unavailable' else 'unavailable'
  result=simulate(kind,employee_id,payload)
  return {**result,'scenario':scenario,'simulation_only':True,'message':'Simulation Mode — No production changes made'}
