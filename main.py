@@ -26,6 +26,16 @@ def err(fn):
  except ValueError as e:raise HTTPException(422,str(e))
 @app.get('/api/health')
 def health():return {'status':'healthy','ml':status()}
+@app.get('/api/firebase/status')
+def firebase_status():
+ from backend_database import get_firestore
+ db = get_firestore()
+ if not db: return {'connected': False, 'message': 'Firebase Admin SDK not initialized'}
+ try:
+  cols = [c.id for c in db.collections()]
+  return {'connected': True, 'source': 'FIREBASE_CREDENTIALS env var' if os.environ.get('FIREBASE_CREDENTIALS') else 'serviceAccountKey.json', 'collections': cols, 'message': 'Vercel is successfully connected to Firebase Firestore!'}
+ except Exception as e:
+  return {'connected': False, 'error': str(e)}
 @app.get('/api/dashboard')
 def dashboard():return dashboard_data()
 @app.get('/api/employees')
