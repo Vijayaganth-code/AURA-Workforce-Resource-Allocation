@@ -53,9 +53,22 @@ DATABASE_PATH=_get_db_path()
 SKILLS=["Python","Java","JavaScript","React","FastAPI","SQL","Machine Learning","Deep Learning","NLP","Computer Vision","Cloud","DevOps","Docker","Cybersecurity","Data Engineering","Data Analysis","UI/UX","Testing","Project Management","System Design"]
 ROLES=[("Backend Engineer",["Python","FastAPI","SQL","Docker","System Design"]),("Data Engineer",["Python","SQL","Data Engineering","Cloud","Docker"]),("Frontend Engineer",["JavaScript","React","UI/UX","Testing","System Design"]),("DevOps Engineer",["Cloud","DevOps","Docker","Cybersecurity","Python"]),("AI Engineer",["Python","Machine Learning","NLP","Deep Learning","Cloud"]),("Data Analyst",["SQL","Data Analysis","Python","Project Management","Testing"])]
 NAMES=["Arun Kumar","Priya Nair","Rahul Mehta","Nikhil Shah","Maya Iyer","Vikram Rao","Aditi Singh","Karan Patel","Sneha Gupta","Arjun Das"]
+_db_initialized = False
+
 @contextmanager
 def connection():
+ global _db_initialized
  c=sqlite3.connect(DATABASE_PATH);c.row_factory=sqlite3.Row;c.execute("PRAGMA foreign_keys=ON")
+ if not _db_initialized:
+  _db_initialized = True
+  try:
+   has_employees = c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='employees'").fetchone()
+   if not has_employees:
+    c.close()
+    initialise_database()
+    c=sqlite3.connect(DATABASE_PATH);c.row_factory=sqlite3.Row;c.execute("PRAGMA foreign_keys=ON")
+  except Exception as e:
+   print(f"Auto-init notice: {e}")
  try: yield c;c.commit()
  finally:c.close()
 def sync_all_to_firebase():

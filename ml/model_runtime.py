@@ -41,6 +41,14 @@ def ensure_models(force=False):
     except Exception as exc: return {'available':False,'mode':'unavailable','reason':str(exc)}
 
 def status():
+    global _completion, _sla
+    if _completion is None or _sla is None:
+        try:
+            import joblib
+            if COMPLETION.exists() and SLA.exists():
+                _completion, _sla = joblib.load(COMPLETION), joblib.load(SLA)
+        except Exception:
+            pass
     out={'available':_completion is not None and _sla is not None,'mode':'trained_random_forest' if _completion is not None else 'unavailable'}
     if METRICS.exists(): out['metrics']=json.loads(METRICS.read_text())
     return out
